@@ -1,3 +1,4 @@
+
 # ═══════════════════════════════════════════════════════
 # CALCULATOR APP - DOCKERFILE
 # ═══════════════════════════════════════════════════════
@@ -29,3 +30,4 @@ HEALTHCHECK --interval=30s --timeout=3s \
 
 # Start nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]
+
