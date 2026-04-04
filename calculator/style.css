@@ -1,0 +1,137 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #0c0c1d, #1a1a3e, #16213e);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calculator {
+    background: #1e1e2e;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    width: 340px;
+}
+
+h2 {
+    color: #00d2ff;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+}
+
+/* Display */
+.display {
+    background: #0c0c1d;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: right;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.previous {
+    color: #636e72;
+    font-size: 1rem;
+    min-height: 24px;
+    margin-bottom: 5px;
+}
+
+.current {
+    color: white;
+    font-size: 2.5rem;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+/* Buttons Grid */
+.buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.btn {
+    padding: 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+}
+
+.btn:active {
+    transform: scale(0.95);
+}
+
+/* Number buttons */
+.number {
+    background: #2d2d44;
+    color: white;
+}
+
+.number:hover {
+    background: #3d3d5c;
+}
+
+/* Operator buttons */
+.operator {
+    background: #1a3a5c;
+    color: #00d2ff;
+}
+
+.operator:hover {
+    background: #224a6e;
+}
+
+/* Clear buttons */
+.clear {
+    background: #3a1c1c;
+    color: #ff6b6b;
+}
+
+.clear:hover {
+    background: #4a2c2c;
+}
+
+/* Equals button */
+.equals {
+    background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+    color: white;
+}
+
+.equals:hover {
+    background: linear-gradient(135deg, #00b8e6, #2d6bc4);
+    box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+}
+
+/* Zero button spans 2 columns */
+.zero {
+    grid-column: span 2;
+}
+
+.footer-text {
+    text-align: center;
+    color: #636e72;
+    font-size: 0.75rem;
+    margin-top: 15px;
+}
+
+

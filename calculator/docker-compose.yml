@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════
+# DOCKER COMPOSE - CALCULATOR APP
+# ═══════════════════════════════════════════════════════
+# Usage: docker-compose up -d
+# Stop: docker-compose down
+# ═══════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  calculator:
+    # Build from local Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    # Container name
+    container_name: calculator-app
+    
+    # Port mapping (host:container)
+    ports:
+      - "8080:80"
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    
+    # Labels for organization
+    labels:
+      app: "calculator"
+      environment: "development"
