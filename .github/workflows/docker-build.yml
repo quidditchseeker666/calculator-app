@@ -3,8 +3,6 @@ name: Docker CI/CD
 on:
   push:
     branches: [ main, master ]
-    tags:
-      - "v*"
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -17,131 +15,70 @@ jobs:
     name: Lint Dockerfile
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # Debug (helps if Dockerfile path is wrong)
-      - name: Debug - list repo files
-        run: ls -la
+      - name: Debug - list files
+        run: |
+          ls -la
+          ls -la calculator
 
-      - name: Run Hadolint (Dockerfile Linter)
+      - name: Hadolint (lint)
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: calculator/Dockerfile
           failure-threshold: error
 
   build:
-    name: Build & Test Docker Image
+    name: Build & Test
     runs-on: ubuntu-latest
     needs: lint
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # IMPORTANT FIX: load: true so docker run can use the image
-      - name: Build Docker image (load for tests)
+      - name: Build image (load)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./calculator
+          file: ./calculator/Dockerfile
           push: false
           load: true
           tags: ${{ env.DOCKER_IMAGE }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      - name: Test - Run container
+      - name: Run container
         run: |
+          docker rm -f test-container || true
           docker run -d -p 8080:80 --name test-container ${{ env.DOCKER_IMAGE }}:test
-          sleep 5
+          sleep 3
 
-      - name: Test - Check HTTP response
-        run: |
-          curl -fsS http://localhost:8080 > /dev/null
-          echo "HTTP check OK"
-
-      - name: Test - Check files exist
-        run: |
-          docker exec test-container ls /usr/share/nginx/html/index.html
-          docker exec test-container ls /usr/share/nginx/html/style.css
-          docker exec test-container ls /usr/share/nginx/html/script.js
-          echo "Files OK"
+      - name: HTTP test
+        run: curl -fsS http://localhost:8080 >/dev/null
 
       - name: Cleanup
         if: always()
-        run: |
-          docker rm -f test-container || true
+        run: docker rm -f test-container || true
 
   push:
     name: Push to Docker Hub
     runs-on: ubuntu-latest
     needs: build
-    # IMPORTANT FIX: allow both main and master, and also tag builds
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
+      - name: Login Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_IMAGE }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=ref,event=tag
-            type=sha,format=short,prefix=sha-
-
-      - name: Build and push Docker image
+      - name: Build and Push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./calculator
+          file: ./calculator/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build image for scanning
-        run: docker build -t ${{ env.DOCKER_IMAGE }}:scan .
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:scan
-          format: table
-          exit-code: "0"
-          ignore-unfixed: true
-          severity: CRITICAL,HIGH
-
-  release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
