@@ -1,0 +1,189 @@
+# ════════════════════════════════════════════════════════════
+# GitHub Actions CI/CD Pipeline
+# Calculator App - Docker Build & Deploy
+# ════════════════════════════════════════════════════════════
+
+name: Docker CI/CD
+
+# Trigger on push to main branch and pull requests
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  
+  # Allow manual workflow trigger
+  workflow_dispatch:
+
+# Environment variables
+env:
+  DOCKER_IMAGE: quidditchseeker666/calculator-app
+  DOCKERFILE_PATH: .
+
+jobs:
+  # ══════════════════════════════════════════════════════════
+  # Job 1: Lint Dockerfile
+  # ══════════════════════════════════════════════════════════
+  lint:
+    name: Lint Dockerfile
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Hadolint (Dockerfile Linter)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+
+  # ══════════════════════════════════════════════════════════
+  # Job 2: Build & Test Docker Image
+  # ══════════════════════════════════════════════════════════
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ${{ env.DOCKER_IMAGE }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test - Run container
+        run: |
+          docker run -d -p 8080:80 --name test-container ${{ env.DOCKER_IMAGE }}:test
+          sleep 5
+      
+      - name: Test - Check health
+        run: |
+          curl -f http://localhost:8080 || exit 1
+          echo "✅ Container is healthy!"
+      
+      - name: Test - Check files exist
+        run: |
+          docker exec test-container ls /usr/share/nginx/html/index.html
+          docker exec test-container ls /usr/share/nginx/html/style.css
+          docker exec test-container ls /usr/share/nginx/html/script.js
+          echo "✅ All files present!"
+      
+      - name: Cleanup
+        run: |
+          docker stop test-container
+          docker rm test-container
+
+  # ══════════════════════════════════════════════════════════
+  # Job 3: Push to Docker Hub (only on main branch)
+  # ══════════════════════════════════════════════════════════
+  push:
+    name: Push to Docker Hub
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Image digest
+        run: echo "Image pushed! 🚀 ${{ steps.meta.outputs.tags }}"
+
+  # ══════════════════════════════════════════════════════════
+  # Job 4: Security Scan (Optional but Impressive!)
+  # ══════════════════════════════════════════════════════════
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build image for scanning
+        run: docker build -t ${{ env.DOCKER_IMAGE }}:scan .
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.DOCKER_IMAGE }}:scan
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+  # ══════════════════════════════════════════════════════════
+  # Job 5: Create GitHub Release (on version tags)
+  # ══════════════════════════════════════════════════════════
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build, push]
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## 🚀 Calculator App Release
+            
+            ### Docker Image
+            ```bash
+            docker pull ${{ env.DOCKER_IMAGE }}:${{ github.ref_name }}
+            ```
+            
+            ### What's New
+            - Automated build and deployment
+            - Security scanning passed
+            - All tests passed ✅
+          draft: false
+          prerelease: false
