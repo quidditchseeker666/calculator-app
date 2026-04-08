@@ -1,33 +1,13 @@
+FROM nginx:1.27-alpine
 
-# ═══════════════════════════════════════════════════════
-# CALCULATOR APP - DOCKERFILE
-# ═══════════════════════════════════════════════════════
-# Description: Containerizes a simple calculator web app
-# Base Image: nginx:alpine (lightweight web server)
-# Author: Your Name
-# Date: 2025
-# ═══════════════════════════════════════════════════════
+LABEL org.opencontainers.image.title="calculator-app" \
+      org.opencontainers.image.description="Calculator web app served by nginx" \
+      org.opencontainers.image.source="https://github.com/quidditchseeker666/calculator-app" \
+      org.opencontainers.image.authors="quidditchseeker666"
 
-# Use official nginx image (Alpine Linux - small size)
-FROM nginx:alpine
+COPY index.html style.css script.js /usr/share/nginx/html/
 
-# Set metadata
-LABEL maintainer="your.email@example.com"
-LABEL description="Calculator Web Application"
-LABEL version="1.0"
-
-# Copy application files to nginx html directory
-COPY index.html /usr/share/nginx/html/
-COPY style.css /usr/share/nginx/html/
-COPY script.js /usr/share/nginx/html/
-
-# Expose port 80 (HTTP)
 EXPOSE 80
 
-# Health check (optional but good practice)
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
-
-# Start nginx in foreground
-CMD ["nginx", "-g", "daemon off;"]
-
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD wget -q -O /dev/null http://localhost/ || exit 1
